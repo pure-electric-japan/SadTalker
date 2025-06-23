@@ -27,4 +27,3 @@ gradio==4.0.2
 gfpgan
 av==10.0.0
 safetensors==0.4.0
-gTTS
