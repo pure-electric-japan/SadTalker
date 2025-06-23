@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import re
 
 
 def calculate_points(heatmaps):
@@ -11,15 +12,15 @@ def calculate_points(heatmaps):
     HW = H * W
     BN_range = np.arange(B * N)
 
-    heatline = heatmaps.reshape(B, N, HW)
-    indexes = np.argmax(heatline, axis=2)
+    heatline = heatmaps.reshape(B * N, HW)
+    indexes = np.argmax(heatline, axis=1)
 
-    preds = np.stack((indexes % W, indexes // W), axis=2)
-    preds = preds.astype(np.float, copy=False)
+    preds = np.stack((indexes % W, indexes // W), axis=1)
+    preds = preds.astype(np.float64, copy=False)
+    preds = preds.reshape(B, N, 2)  # 保证和think_diff一致
 
     inr = indexes.ravel()
 
-    heatline = heatline.reshape(B * N, HW)
     x_up = heatline[BN_range, inr + 1]
     x_down = heatline[BN_range, inr - 1]
     # y_up = heatline[BN_range, inr + W]
@@ -38,7 +39,7 @@ def calculate_points(heatmaps):
 
     preds += think_diff.reshape(B, N, 2)
     preds += .5
-    return preds
+    return preds.reshape(-1, 2)
 
 
 class AddCoordsTh(nn.Module):
@@ -376,3 +377,13 @@ class FAN(nn.Module):
         pred += offset[-2:]
 
         return pred
+
+# 修复np.float6464...和np.float64错误替换
+with open(__file__, 'r', encoding='utf-8') as f:
+    content = f.read()
+# 先修复错误替换
+content = re.sub(r'np\.float6{2,}', 'np.float64', content)
+# 再只替换独立的np.float64（不是np.float64）
+content = re.sub(r'np\.float(?!64)', 'np.float64', content)
+with open(__file__, 'w', encoding='utf-8') as f:
+    f.write(content)
